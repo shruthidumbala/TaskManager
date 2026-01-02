@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="min-h-screen bg-zinc-900 text-white">
+<main class="w-full min-h-screen bg-zinc-900">
+<style>
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.toast {
+  animation: toastIn 0.3s ease-out;
+}
+</style>
+
+<!-- TOP BAR -->
+<div class="flex items-center justify-between px-10 pt-6">
+  <h1 class="text-2xl font-semibold">Task Manager</h1>
+  <div id="userInfo" class="flex items-center space-x-4"></div>
+</div>
+
+<!-- LOADING -->
+<div id="loading" class="flex items-center justify-center min-h-[400px]">
+  <p class="text-zinc-400">Loading tasks...</p>
+</div>
+
+<!-- ADMIN CREATE -->
+<div id="adminSection" class="hidden p-10">
+  <!-- Developers List -->
+  <div class="mb-6">
+    <h2 class="text-xl font-semibold mb-4">Developers Status</h2>
+    <div id="developersList" class="flex flex-wrap gap-3 mb-6"></div>
+  </div>
+
+  <form id="createForm" class="space-y-4">
+    <input id="title" class="w-full bg-zinc-800 px-5 py-2 rounded" placeholder="Title" required>
+    <textarea id="details" class="w-full bg-zinc-800 px-5 py-2 rounded h-32" placeholder="Details" required></textarea>
+
+    <!-- Priority (Emergency level) -->
+    <div class="flex gap-4 flex-wrap">
+      <div class="flex-1 min-w-[140px]">
+        <label for="priority" class="block text-sm text-zinc-300 mb-1">Priority / Emergency</label>
+        <select id="priority" class="w-full bg-zinc-800 px-4 py-2 rounded">
+          <option value="high">High (Urgent)</option>
+          <option value="medium" selected>Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+
+      <!-- Deadline -->
+      <div class="flex-1 min-w-[140px]">
+        <label for="dueDate" class="block text-sm text-zinc-300 mb-1">Deadline</label>
+        <input
+          id="dueDate"
+          type="date"
+          class="w-full bg-zinc-800 px-4 py-2 rounded"
+          min=""
+        />
+      </div>
+
+      <!-- Assign to Developer -->
+      <div class="flex-1 min-w-[140px]">
+        <label for="assigneeEmail" class="block text-sm text-zinc-300 mb-1">Assign To</label>
+        <select id="assigneeEmail" class="w-full bg-zinc-800 px-4 py-2 rounded">
+          <option value="">Unassigned</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="bg-blue-600 px-6 py-2 rounded">Create Task</button>
+    <p id="message" class="text-red-500"></p>
+  </form>
+</div>
+
+<!-- DEVELOPER SECTION -->
+<div id="developerSection" class="hidden p-10">
+  <!-- Attendance Section -->
+  <div class="mb-6 bg-zinc-800 p-4 rounded">
+    <h2 class="text-xl font-semibold mb-4">Mark Attendance</h2>
+    <div class="flex gap-4">
+      <button id="markPresent" class="bg-emerald-600 px-6 py-2 rounded hover:bg-emerald-700">
+        Mark Present
+      </button>
+      <button id="markAbsent" class="bg-red-600 px-6 py-2 rounded hover:bg-red-700">
+        Mark Absent
+      </button>
+      <span id="attendanceStatus" class="px-4 py-2 bg-zinc-700 rounded"></span>
+    </div>
+  </div>
+  <!-- Optional message element (used in your original code) -->
+  <p id="developerMessage" class="hidden text-sm text-zinc-400"></p>
+</div>
+
+<!-- TASKS -->
+<div id="tasksSection" class="flex flex-wrap gap-4 p-10 hidden"></div>
+<div id="noTasks" class="hidden p-10 text-center text-zinc-500">No tasks yet.</div>
+
+<!-- VIEW MODAL -->
+<div id="viewModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target === this) closeViewModal()">
+  <div class="bg-zinc-800 p-6 rounded w-auto min-w-[300px] max-w-[90%] max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+    <h2 id="viewTitle" class="text-xl font-semibold mb-4 break-words"></h2>
+    <p id="viewDetails" class="text-sm text-zinc-300 break-words whitespace-pre-wrap"></p>
+    <button onclick="closeViewModal()" class="mt-4 bg-zinc-600 px-4 py-2 rounded hover:bg-zinc-700">Close</button>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target === this) closeEditModal()">
+  <div class="bg-zinc-800 p-6 rounded w-full max-w-md max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+    <input id="editTitle" class="w-full bg-zinc-700 px-4 py-2 mb-3 rounded">
+    <textarea id="editDetails" class="w-full bg-zinc-700 px-4 py-2 h-32 rounded"></textarea>
+
+    <!-- Edit Priority & Deadline -->
+    <div class="flex gap-4 flex-wrap mt-3">
+      <div class="flex-1 min-w-[140px]">
+        <label for="editPriority" class="block text-sm text-zinc-300 mb-1">Priority / Emergency</label>
+        <select id="editPriority" class="w-full bg-zinc-700 px-4 py-2 rounded">
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="flex-1 min-w-[140px]">
+        <label for="editDueDate" class="block text-sm text-zinc-300 mb-1">Deadline</label>
+        <input id="editDueDate" type="date" class="w-full bg-zinc-700 px-4 py-2 rounded" min="" />
+      </div>
+      <div id="editAssigneeSection" class="flex-1 min-w-[140px] hidden">
+        <label for="editAssigneeEmail" class="block text-sm text-zinc-300 mb-1">Assign To</label>
+        <select id="editAssigneeEmail" class="w-full bg-zinc-700 px-4 py-2 rounded">
+          <option value="">Unassigned</option>
+        </select>
+      </div>
+    </div>
+
+    <button onclick="saveEdit()" class="bg-emerald-600 px-4 py-2 mt-4 rounded">Save</button>
+    <button onclick="closeEditModal()" class="bg-zinc-600 px-4 py-2 mt-4 rounded">Cancel</button>
+  </div>
+</div>
+
+<script>
+function showToast(message, type = "info") {
+  const toast = document.createElement("div");
+
+  const bg = {
+    success: "bg-emerald-600",
+    info: "bg-blue-600",
+    warning: "bg-yellow-600",
+    error: "bg-red-600",
+  };
+
+  toast.className = `
+    ${bg[type]} text-white px-5 py-3 rounded-lg shadow-lg
+  `;
+  toast.classList.add("toast");
+  toast.textContent = message;
+  document.getElementById("toastContainer").appendChild(toast);
+
+  setTimeout(() => toast.remove(), 3000);
+}
+  
+const socket = io();
+
+// ---- SINGLE set of socket listeners (no duplicates) ----
+socket.on("taskCreated", (task) => {
+  showToast(`🆕 New task created: ${task.title}`, "success");
+  initPage();
+});
+
+socket.on("taskUpdated", (task) => {
+  showToast(`✏️ Task updated: ${task.title}`, "info");
+  initPage();
+});
+
+socket.on("taskDeleted", () => {
+  showToast("🗑️ Task deleted", "warning");
+  initPage();
+});
+
+// Listen for attendance updates
+socket.on("attendanceUpdated", (data) => {
+  console.log("Attendance updated:", data);
+  const token = getToken();
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      if (payload.role === "admin") {
+        loadDevelopers();
+      } else if (payload.role === "developer" && payload.email === data.email) {
+        updateAttendanceDisplay(data.attendance);
+      }
+    } catch (err) {
+      console.error("Error parsing token for attendance update:", err);
+    }
+  }
+});
+
+function getToken() {
+  return localStorage.getItem("token");
+}
+
+function authenticatedFetch(url, options = {}) {
+  return fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${getToken()}`
+    }
+  });
+}
+
+let currentEditingTaskId = null;
+let currentUser = null;
+
+// VIEW
+function viewTask(taskId) {
+  authenticatedFetch(`/api/task/${taskId}`)
+    .then(r => r.json())
+    .then(task => {
+      document.getElementById("viewTitle").textContent = task.title;
+      document.getElementById("viewDetails").textContent = task.details;
+      document.getElementById("viewModal").classList.remove("hidden");
+    })
+    .catch(() => alert("Failed to load task"));
+}
+
+function closeViewModal() {
+  document.getElementById("viewModal").classList.add("hidden");
+}
+
+// EDIT
+async function editTask(taskId) {
+  try {
+    const r = await authenticatedFetch(`/api/task/${taskId}`);
+    const task = await r.json();
+    
+    currentEditingTaskId = task._id;
+    editTitle.value = task.title;
+    editDetails.value = task.details;
+
+    if (task.priority) {
+      editPriority.value = task.priority;
+    } else {
+      editPriority.value = "medium";
+    }
+
+    if (task.dueDate) {
+      const d = new Date(task.dueDate);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      editDueDate.value = `${yyyy}-${mm}-${dd}`;
+    } else {
+      editDueDate.value = "";
+    }
+    
+    const editAssigneeSection = document.getElementById("editAssigneeSection");
+    const editAssigneeEmail = document.getElementById("editAssigneeEmail");
+    if (currentUser.role === "admin" && editAssigneeSection && editAssigneeEmail) {
+      editAssigneeSection.classList.remove("hidden");
+      await loadDevelopers();
+      editAssigneeEmail.value = task.assigneeEmail || "";
+    }
+    
+    setMinDateToday();
+    editModal.classList.remove("hidden");
+  } catch (err) {
+    console.error("Error loading task for edit:", err);
+    alert("Failed to load task");
+  }
+}
+
+function saveEdit() {
+  const dueDateValue = editDueDate.value;
+  const assigneeEmailValue = document.getElementById("editAssigneeEmail")?.value || "";
+  
+  if (dueDateValue) {
+    const deadlineDate = new Date(dueDateValue + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadlineDate.setHours(0, 0, 0, 0);
+    
+    if (deadlineDate < today) {
+      alert("Cannot set deadline to a past date");
+      return;
+    }
+  }
+
+  const updateData = {
+    title: editTitle.value,
+    details: editDetails.value,
+    priority: editPriority.value,
+    dueDate: dueDateValue || null
+  };
+
+  if (currentUser.role === "admin") {
+    updateData.assigneeEmail = assigneeEmailValue || null;
+  }
+
+  authenticatedFetch(`/api/task/${currentEditingTaskId}`, {
+    method: "PUT",
+    body: JSON.stringify(updateData)
+  }).then(async (res) => {
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.message || "Failed to update task");
+      return;
+    }
+    location.reload();
+  }).catch(err => {
+    console.error("Update error:", err);
+    alert("Failed to update task");
+  });
+}
+
+function closeEditModal() {
+  editModal.classList.add("hidden");
+}
+
+// Load developers list (admin only)
+let developersList = [];
+async function loadDevelopers() {
+  try {
+    const res = await authenticatedFetch("/api/developers");
+    if (!res.ok) {
+      console.error("Failed to fetch developers:", res.status, res.statusText);
+      return;
+    }
+    developersList = await res.json();
+    
+    console.log("Developers loaded:", developersList);
+    
+    if (!developersList || !Array.isArray(developersList)) {
+      console.error("Invalid developers response:", developersList);
+      return;
+    }
+    
+    const developersListEl = document.getElementById("developersList");
+    if (developersListEl) {
+      if (developersList.length === 0) {
+        developersListEl.innerHTML = '<p class="text-zinc-400 text-sm">No developers found. Register developers to assign tasks.</p>';
+      } else {
+        developersListEl.innerHTML = developersList.map(dev => {
+          const statusColor = dev.attendance === "present" ? "bg-emerald-600" : "bg-red-600";
+          const lastUpdate = dev.lastAttendanceUpdate 
+            ? new Date(dev.lastAttendanceUpdate).toLocaleString() 
+            : "Never";
+          return `
+            <div class="bg-zinc-800 p-3 rounded">
+              <div class="flex items-center gap-2">
+                <span class="${statusColor} w-3 h-3 rounded-full"></span>
+                <span class="font-medium">${dev.name}</span>
+              </div>
+              <p class="text-xs text-zinc-400 mt-1">${dev.email}</p>
+              <p class="text-xs text-zinc-400">Last update: ${lastUpdate}</p>
+            </div>
+          `;
+        }).join("");
+      }
+    } else {
+      console.error("developersList element not found");
+    }
+    
+    const assigneeSelects = document.querySelectorAll("#assigneeEmail, #editAssigneeEmail");
+    if (assigneeSelects.length === 0) {
+      console.warn("No assignee dropdowns found");
+    } else {
+      assigneeSelects.forEach(select => {
+        const currentValue = select.value;
+        let optionsHTML = '<option value="">Unassigned</option>';
+        // Filter to show only present employees
+        const presentDevelopers = developersList.filter(dev => dev.attendance === "present");
+        if (presentDevelopers.length > 0) {
+          optionsHTML += presentDevelopers.map(dev => 
+            `<option value="${dev.email}">${dev.name}</option>`
+          ).join("");
+        }
+        select.innerHTML = optionsHTML;
+        // Only set value if it's still valid (present employee)
+        if (currentValue && presentDevelopers.some(dev => dev.email === currentValue)) {
+          select.value = currentValue;
+        } else {
+          select.value = "";
+        }
+      });
+      console.log("Updated", assigneeSelects.length, "assignee dropdown(s) with only present employees");
+    }
+  } catch (err) {
+    console.error("Error loading developers:", err);
+    alert("Failed to load developers. Check console for details.");
+  }
+}
+
+// Mark attendance (developer)
+async function markAttendance(status) {
+  try {
+    const markPresentBtn = document.getElementById("markPresent");
+    const markAbsentBtn = document.getElementById("markAbsent");
+    
+    if (markPresentBtn) markPresentBtn.disabled = true;
+    if (markAbsentBtn) markAbsentBtn.disabled = true;
+    
+    console.log("Marking attendance as:", status);
+    const res = await authenticatedFetch("/api/attendance", {
+      method: "POST",
+      body: JSON.stringify({ status })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ message: "Unknown error" }));
+      console.error("Attendance API error:", res.status, errorData);
+      showToast(errorData.message || `Failed to mark attendance`, "error");
+      if (markPresentBtn) markPresentBtn.disabled = false;
+      if (markAbsentBtn) markAbsentBtn.disabled = false;
+      return;
+    }
+    
+    const data = await res.json();
+    console.log("Attendance marked successfully:", data);
+    showToast(`Attendance marked as ${status}`, "success");
+    updateAttendanceDisplay(status);
+    
+    if (markPresentBtn) markPresentBtn.disabled = false;
+    if (markAbsentBtn) markAbsentBtn.disabled = false;
+  } catch (err) {
+    console.error("Error marking attendance:", err);
+    showToast(`Failed to mark attendance: ${err.message || "Network error"}`, "error");
+    
+    const markPresentBtn = document.getElementById("markPresent");
+    const markAbsentBtn = document.getElementById("markAbsent");
+    if (markPresentBtn) markPresentBtn.disabled = false;
+    if (markAbsentBtn) markAbsentBtn.disabled = false;
+  }
+}
+
+function updateAttendanceDisplay(status) {
+  const statusEl = document.getElementById("attendanceStatus");
+  if (statusEl) {
+    statusEl.textContent = `Current Status: ${status.toUpperCase()}`;
+    statusEl.className = `px-4 py-2 rounded ${
+      status === "present" ? "bg-emerald-600" : "bg-red-600"
+    }`;
+  }
+}
+
+// Setup attendance buttons (developer) - your original logic
+let attendanceButtonsSetup = false;
+
+function setupAttendanceButtons() {
+  try {
+    console.log("Setting up attendance buttons...");
+    const markPresentBtn = document.getElementById("markPresent");
+    const markAbsentBtn = document.getElementById("markAbsent");
+
+    console.log("Present button found:", !!markPresentBtn);
+    console.log("Absent button found:", !!markAbsentBtn);
+
+    if (!markPresentBtn || !markAbsentBtn) {
+      console.warn("Attendance buttons not found, will retry...");
+      return;
+    }
+
+    const attendanceContainer = markPresentBtn.parentElement;
+    if (attendanceContainer && !attendanceButtonsSetup) {
+      attendanceContainer.addEventListener("click", function(e) {
+        if (e.target.id === "markPresent" || e.target.closest("#markPresent")) {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log("Present button clicked!");
+          markAttendance("present");
+        } else if (e.target.id === "markAbsent" || e.target.closest("#markAbsent")) {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log("Absent button clicked!");
+          markAttendance("absent");
+        }
+      });
+      attendanceButtonsSetup = true;
+      console.log("Attendance buttons setup complete using event delegation");
+    } else if (!attendanceButtonsSetup) {
+      markPresentBtn.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("Present button clicked!");
+        markAttendance("present");
+      };
+      
+      markAbsentBtn.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("Absent button clicked!");
+        markAttendance("absent");
+      };
+      attendanceButtonsSetup = true;
+      console.log("Attendance buttons setup complete using direct listeners");
+    }
+  } catch (err) {
+    console.error("Error setting up attendance buttons:", err);
+  }
+}
+
+// Update task status
+async function updateTaskStatus(taskId, status) {
+  try {
+    console.log("Updating task status:", { taskId, status });
+    const res = await authenticatedFetch(`/api/task/${taskId}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status })
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ message: "Unknown error" }));
+      console.error("Task status API error:", res.status, errorData);
+      alert(errorData.message || `Failed to update task status. Status: ${res.status}`);
+      return;
+    }
+    
+    const data = await res.json();
+    console.log("Task status updated successfully:", data);
+    showToast(`Task status updated to ${status}`, "success");
+    initPage();
+  } catch (err) {
+    console.error("Error updating task status:", err);
+    alert(`Failed to update task status: ${err.message || "Network error"}`);
+  }
+}
+
+function deleteTask(taskId) {
+  if (!confirm("Are you sure you want to delete this task?")) return;
+
+  authenticatedFetch(`/api/task/${taskId}`, { method: "DELETE" })
+    .then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || "Delete failed");
+      alert(data.message);
+      initPage();
+    })
+    .catch(err => {
+      console.error("Delete failed:", err);
+      alert(err.message || "Failed to delete task");
+    });
+}
+
+// INIT
+async function initPage() {
+  const token = getToken();
+  if (!token) {
+    console.log("No token found, redirecting to login");
+    return location.href = "/";
+  }
+
+  // Reset flag so setupAttendanceButtons can attach once for this load
+  attendanceButtonsSetup = false;
+
+  let payload;
+  try {
+    payload = JSON.parse(atob(token.split(".")[1]));
+    console.log("Decoded token payload:", payload);
+  } catch (err) {
+    console.error("Error decoding token:", err);
+    alert("Invalid token. Please login again.");
+    localStorage.removeItem("token");
+    location.href = "/";
+    return;
+  }
+
+  currentUser = payload;
+
+  // Show user info
+  const userInfoEl = document.getElementById("userInfo");
+  if (userInfoEl) {
+    userInfoEl.innerHTML = `
+      <span class="bg-blue-600 px-3 py-1 rounded">${payload.role}</span>
+      <button onclick="logout()" class="bg-red-600 px-3 py-1 rounded">Logout</button>
+    `;
+  }
+
+  // Show/hide sections based on role FIRST (before loading tasks)
+  console.log("User role:", payload.role);
+  if (payload.role === "admin") {
+    console.log("Showing admin section");
+    const adminSection = document.getElementById("adminSection");
+    const developerSection = document.getElementById("developerSection");
+    if (adminSection) adminSection.classList.remove("hidden");
+    if (developerSection) developerSection.classList.add("hidden");
+    
+    try {
+      await loadDevelopers();
+    } catch (err) {
+      console.error("Error loading developers:", err);
+    }
+  } else if (payload.role === "developer") {
+    console.log("Showing developer section");
+    const adminSection = document.getElementById("adminSection");
+    const developerSection = document.getElementById("developerSection");
+    if (adminSection) adminSection.classList.add("hidden");
+    if (developerSection) developerSection.classList.remove("hidden");
+    
+    // Setup attendance buttons after section is visible
+    setTimeout(() => {
+      setupAttendanceButtons();
+    }, 200);
+    
+    // Retry setup after a longer delay as fallback
+    setTimeout(() => {
+      const presentBtn = document.getElementById("markPresent");
+      const absentBtn = document.getElementById("markAbsent");
+      if (presentBtn && !presentBtn.onclick) {
+        console.log("Retrying attendance button setup...");
+        setupAttendanceButtons();
+      }
+    }, 500);
+    
+    // Load developer's attendance status
+    try {
+      const devRes = await authenticatedFetch("/api/my-attendance");
+      if (devRes.ok) {
+        const data = await devRes.json();
+        if (data.attendance) {
+          updateAttendanceDisplay(data.attendance);
+        } else {
+          updateAttendanceDisplay("absent");
+        }
+      } else {
+        console.error("Failed to load attendance:", devRes.status);
+        updateAttendanceDisplay("absent");
+      }
+    } catch (err) {
+      console.error("Error loading attendance:", err);
+      updateAttendanceDisplay("absent");
+    }
+  } else {
+    console.error("Unknown role:", payload.role);
+  }
+
+  // Now load tasks
+  try {
+    const res = await authenticatedFetch("/api/tasks");
+    if (!res.ok) {
+      if (res.status === 401) {
+        alert("Session expired. Please login again.");
+        localStorage.removeItem("token");
+        location.href = "/";
+        return;
+      }
+      throw new Error(`Failed to fetch tasks: ${res.status} ${res.statusText}`);
+    }
+    const tasks = await res.json();
+    const loading = document.getElementById("loading");
+    if (loading) loading.classList.add("hidden");
+
+    if (!tasks || !Array.isArray(tasks)) {
+      console.error("Invalid tasks response:", tasks);
+      const noTasks = document.getElementById("noTasks");
+      const tasksSection = document.getElementById("tasksSection");
+      if (noTasks) noTasks.classList.remove("hidden");
+      if (tasksSection) tasksSection.classList.add("hidden");
+      return;
+    }
+
+    const noTasks = document.getElementById("noTasks");
+    const tasksSection = document.getElementById("tasksSection");
+    
+    if (!tasks.length) {
+      if (noTasks) noTasks.classList.remove("hidden");
+      if (tasksSection) tasksSection.classList.add("hidden");
+      return;
+    } else {
+      if (noTasks) noTasks.classList.add("hidden");
+    }
+
+    if (tasksSection) {
+      tasksSection.classList.remove("hidden");
+      
+      // Sort by priority (emergency) and nearest deadline
+      const priorityRank = { high: 0, medium: 1, low: 2 };
+      tasks.sort((a, b) => {
+        const pa = priorityRank[a.priority] ?? 1;
+        const pb = priorityRank[b.priority] ?? 1;
+        if (pa !== pb) return pa - pb; // high first
+
+        const ad = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const bd = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        if (ad !== bd) return ad - bd; // earliest deadlines first
+
+        // fallback: newest created first
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+
+      const statusColors = {
+        "todo": "bg-yellow-600",
+        "in-progress": "bg-blue-600",
+        "done": "bg-emerald-600"
+      };
+
+      tasksSection.innerHTML = tasks.map(t => {
+        const deadlineText = t.dueDate
+          ? new Date(t.dueDate).toLocaleDateString()
+          : "No deadline";
+
+        const priorityText = (t.priority || "medium");
+        const statusText = (t.status || "todo");
+        const assigneeText = t.assigneeEmail || "Unassigned";
+
+        return `
+        <div class="bg-zinc-800 p-4 rounded w-64 group break-words">
+          <h3 class="font-semibold mb-1">${t.title}</h3>
+          <p class="text-xs text-zinc-400 mb-1">Priority: <span class="capitalize">${priorityText}</span></p>
+          <p class="text-xs text-zinc-400 mb-1">Status: <span class="capitalize ${statusColors[statusText]} px-2 py-0.5 rounded">${statusText}</span></p>
+          <p class="text-xs text-zinc-400 mb-1">Assigned to: ${assigneeText}</p>
+          <p class="text-xs text-zinc-400 mb-2">Deadline: ${deadlineText}</p>
+          <div class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 mt-3 flex gap-2 flex-wrap">
+            <button onclick="viewTask('${t._id}')" class="bg-emerald-600 px-3 py-1 rounded text-xs hover:bg-emerald-700">View</button>
+            ${payload.role === "admin" ? `
+              <button onclick="editTask('${t._id}')" class="bg-blue-600 px-3 py-1 rounded text-xs hover:bg-blue-700">Edit</button>
+              <button onclick="deleteTask('${t._id}')" class="bg-red-600 px-3 py-1 rounded text-xs hover:bg-red-700">Delete</button>
+            ` : payload.role === "developer" && t.assigneeEmail && t.assigneeEmail === payload.email ? `
+              <button onclick="updateTaskStatus('${t._id}', 'todo')" class="bg-yellow-600 px-2 py-1 rounded text-xs hover:bg-yellow-700">Todo</button>
+              <button onclick="updateTaskStatus('${t._id}', 'in-progress')" class="bg-blue-600 px-2 py-1 rounded text-xs hover:bg-blue-700">In Progress</button>
+              <button onclick="updateTaskStatus('${t._id}', 'done')" class="bg-emerald-600 px-2 py-1 rounded text-xs hover:bg-emerald-700">Done</button>
+            ` : payload.role === "developer" ? `
+              <span class="text-xs text-zinc-500">Not assigned to you</span>
+            ` : ""}
+          </div>
+        </div>
+        `;
+      }).join("");
+    }
+    
+    if (payload.role === "admin") {
+      setTimeout(() => {
+        setMinDateToday();
+      }, 100);
+    }
+  } catch (err) {
+    console.error("Error initializing page:", err);
+    const loading = document.getElementById("loading");
+    if (loading) loading.classList.add("hidden");
+    alert("Failed to load tasks: " + err.message + ". Please check console for details.");
+  }
+}
+
+function logout() {
+  localStorage.removeItem("token");
+  location.href = "/";
+}
+
+window.onload = initPage;
+
+// Set minimum date to today for date inputs
+function setMinDateToday() {
+  const today = new Date().toISOString().split('T')[0];
+  const dueDateInput = document.getElementById('dueDate');
+  const editDueDateInput = document.getElementById('editDueDate');
+  
+  if (dueDateInput) {
+    dueDateInput.setAttribute('min', today);
+  }
+  if (editDueDateInput) {
+    editDueDateInput.setAttribute('min', today);
+  }
+}
+
+// CREATE TASK
+const createForm = document.getElementById("createForm");
+const message = document.getElementById("message");
+
+window.addEventListener('load', () => {
+  setTimeout(setMinDateToday, 200);
+});
+
+createForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const title = document.getElementById("title").value.trim();
+  const details = document.getElementById("details").value.trim();
+  const priority = document.getElementById("priority").value;
+  const dueDate = document.getElementById("dueDate").value;
+  const assigneeEmail = document.getElementById("assigneeEmail")?.value || "";
+
+  message.textContent = "";
+  message.classList.remove("hidden");
+
+  if (!title || !details) {
+    message.textContent = "Title and details required";
+    return;
+  }
+
+  if (dueDate) {
+    const deadlineDate = new Date(dueDate + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadlineDate.setHours(0, 0, 0, 0);
+    
+    if (deadlineDate < today) {
+      message.textContent = "Cannot create task with a deadline in the past";
+      return;
+    }
+  }
+
+  try {
+    const res = await authenticatedFetch("/create", {
+      method: "POST",
+      body: JSON.stringify({ title, details, priority, dueDate, assigneeEmail: assigneeEmail || undefined })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      message.textContent = data.message || "Failed to create task";
+      message.classList.remove("hidden");
+      console.error("Create task error:", data.message);
+      return;
+    }
+
+    createForm.reset();
+    message.textContent = "";
+    setMinDateToday();
+    initPage();
+  } catch (err) {
+    console.error(err);
+    message.textContent = "Error creating task";
+  }
+});
+</script>
+
+<!-- TOAST NOTIFICATIONS -->
+<div id="toastContainer" class="fixed top-5 right-5 z-50 space-y-3"></div>
+
+</main>
+</body>
+</html>

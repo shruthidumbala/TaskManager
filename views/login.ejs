@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Task Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-zinc-900 text-white flex items-center justify-center p-10">
+  <div class="w-full max-w-md bg-zinc-800 p-8 rounded-xl">
+    <h1 class="text-3xl font-bold text-center mb-8 text-white">Task Manager</h1>
+    
+    <form id="loginForm" class="space-y-4">
+      <input
+        type="email"
+        id="email"
+        placeholder="Enter your email"
+        class="w-full px-4 py-3 bg-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-zinc-400"
+        required
+      />
+      <input
+        type="password"
+        id="password"
+        placeholder="Enter your password"
+        class="w-full px-4 py-3 bg-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-zinc-400"
+        required
+      />
+      <button
+        type="submit"
+        class="w-full py-3 bg-emerald-600 rounded-lg hover:bg-emerald-700 font-medium transition-all"
+      >
+         Login
+      </button>
+    </form>
+
+    <p id="message" class="mt-4 text-center text-red-500 hidden"></p>
+    
+    <p class="mt-6 text-center text-zinc-400 text-sm">
+      No account? <a href="/register" class="text-emerald-400 hover:underline">Register</a>
+    </p>
+    <p class="mt-2 text-center text-zinc-400 text-sm">
+      Forgot password? <a href="/forgot" class="text-emerald-400 hover:underline">Reset here</a>
+    </p>
+  </div>
+
+  <script>
+    console.log('Login page loaded - token check:', localStorage.getItem('token'));
+    
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const msgEl = document.getElementById('message');
+      
+      msgEl.textContent = 'Logging in...';
+      msgEl.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+        console.log(' Login response:', data);
+        
+        if (res.ok && data.token) {
+          localStorage.setItem('token', data.token);
+          // Decode token to get role
+          try {
+            const payload = JSON.parse(atob(data.token.split('.')[1]));
+            localStorage.setItem('role', payload.role);
+            console.log(' Token SAVED, role:', payload.role, 'redirecting to /home');
+          } catch (e) {
+            console.error('Error decoding token:', e);
+          }
+          window.location.href = '/home';
+        } else {
+          msgEl.textContent = data.message || 'Login failed';
+        }
+      } catch (err) {
+        console.error('Login error:', err);
+        msgEl.textContent = 'Network error';
+      }
+    });
+  </script>
+</body>
+</html>

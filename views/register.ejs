@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Register</title>
+    <style>
+      /* reuse same styling as login for consistency */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background:
+          radial-gradient(circle at 0% 0%, #abafb9 ),
+          radial-gradient(circle at 100% 100%, #020617 );
+        color: #e5e7eb;
+      }
+      .card {
+        width: 100%;
+        max-width: 380px;
+        padding: 32px 28px;
+        border-radius: 18px;
+        background: linear-gradient(
+          135deg,
+          rgba(15, 23, 42, 0.96),
+          rgba(15, 23, 42, 0.98)
+        );
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8),
+          0 0 0 1px rgba(148, 163, 184, 0.15);
+        backdrop-filter: blur(18px);
+      }
+      .logo-circle {
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        margin: 0 auto 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: conic-gradient(
+          from 140deg,
+          #1a1c1a
+        );
+        box-shadow: 0 0 25px rgba(237, 245, 240, 0.7);
+        font-size: 22px;
+      }
+      h2 {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-align: center;
+        margin-bottom: 6px;
+      }
+      .subtitle {
+        text-align: center;
+        font-size: 13px;
+        color: #9ca3af;
+        margin-bottom: 20px;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        margin-bottom: 6px;
+        color: #9ca3af;
+      }
+      input {
+        width: 100%;
+        padding: 10px 11px;
+        border-radius: 10px;
+        border: 1px solid #1f2937;
+        background-color: #020617;
+        color: #e5e7eb;
+        font-size: 13px;
+        outline: none;
+        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9);
+        margin-bottom: 10px;
+      }
+      input::placeholder {
+        color: #6b7280;
+      }
+      button[type="submit"] {
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: none;
+        cursor: pointer;
+        background: linear-gradient(135deg, #07180d);
+        color: #f9fafb;
+        font-weight: 600;
+        font-size: 14px;
+        letter-spacing: 0.04em;
+        box-shadow: 0 10px 30px rgba(10, 13, 11, 0.6),
+          0 0 0 1px rgba(6, 9, 7, 0.4);
+      }
+      #message {
+        margin-top: 14px;
+        font-size: 13px;
+        text-align: center;
+      }
+      .bottom-text {
+        margin-top: 14px;
+        font-size: 13px;
+        text-align: center;
+        color: #9ca3af;
+      }
+      .bottom-text a {
+        color: #d0d6dd;
+        text-decoration: none;
+        margin-left: 4px;
+      }
+      .bottom-text a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      
+      <h2>Create an account</h2>
+      <p class="subtitle">Register to start using the task manager</p>
+
+      <form id="registerForm">
+        <label>Name</label>
+        <input
+          type="text"
+          id="regName"
+          placeholder="Your name"
+          required
+        />
+
+        <label>Email</label>
+        <input
+          type="email"
+          id="regEmail"
+          placeholder="email@example.com"
+          required
+        />
+
+        <label>Password</label>
+        <input
+          type="password"
+          id="regPassword"
+          placeholder="Choose a password"
+          required
+        />
+
+        <button type="submit">Register</button>
+      </form>
+
+      <p id="message"></p>
+
+      <p class="bottom-text">
+        Already have an account?
+        <a href="/">Sign in →</a>
+      </p>
+    </div>
+
+    <script>
+      const registerForm = document.getElementById("registerForm");
+      const messageEl = document.getElementById("message");
+
+      registerForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById("regName").value;
+        const email = document.getElementById("regEmail").value;
+        const password = document.getElementById("regPassword").value;
+
+        try {
+          const res = await fetch("/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, password }),
+          });
+
+          const data = await res.json();
+
+          if (res.ok) {
+            messageEl.style.color = "#4ade80";
+            messageEl.textContent =
+              data.message || "Registered! Redirecting to login...";
+            setTimeout(() => {
+              window.location.href = "/";
+            }, 1200);
+          } else {
+            messageEl.style.color = "#f87171";
+            messageEl.textContent =
+              data.message || "Registration failed";
+          }
+        } catch (err) {
+          messageEl.style.color = "#f87171";
+          messageEl.textContent = "Registration error";
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Password - Task Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-zinc-900 text-white flex items-center justify-center p-10">
+  <div class="w-full max-w-md bg-zinc-800 p-8 rounded-xl">
+    <h1 class="text-2xl font-bold text-center mb-6 text-white">Reset Password</h1>
+
+    <form id="forgotForm" class="space-y-4">
+      <input
+        type="email"
+        id="email"
+        placeholder="Enter your registered email"
+        class="w-full px-4 py-3 bg-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-zinc-400"
+        required
+      />
+      <input
+        type="password"
+        id="newPassword"
+        placeholder="Enter new password"
+        class="w-full px-4 py-3 bg-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-zinc-400"
+        required
+      />
+      <input
+        type="password"
+        id="confirmPassword"
+        placeholder="Confirm new password"
+        class="w-full px-4 py-3 bg-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-zinc-400"
+        required
+      />
+
+      <button
+        type="submit"
+        class="w-full py-3 bg-emerald-600 rounded-lg hover:bg-emerald-700 font-medium transition-all"
+      >
+        Reset Password
+      </button>
+    </form>
+
+    <p id="message" class="mt-4 text-center text-sm"></p>
+
+    <p class="mt-6 text-center text-zinc-400 text-sm">
+      Remembered password? <a href="/" class="text-emerald-400 hover:underline">Back to login</a>
+    </p>
+  </div>
+
+  <script>
+    document.getElementById('forgotForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('email').value.trim();
+      const newPassword = document.getElementById('newPassword').value.trim();
+      const confirmPassword = document.getElementById('confirmPassword').value.trim();
+      const msgEl = document.getElementById('message');
+
+      msgEl.classList.remove('text-red-500', 'text-emerald-500');
+      msgEl.textContent = '';
+
+      if (newPassword !== confirmPassword) {
+        msgEl.textContent = 'Passwords do not match';
+        msgEl.classList.add('text-red-500');
+        return;
+      }
+
+      msgEl.textContent = 'Updating password...';
+
+      try {
+        const res = await fetch('/forgot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, newPassword })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          msgEl.textContent = data.message || 'Failed to update password';
+          msgEl.classList.add('text-red-500');
+          return;
+        }
+
+        msgEl.textContent = data.message || 'Password updated. Redirecting to login...';
+        msgEl.classList.add('text-emerald-500');
+
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
+      } catch (err) {
+        console.error('Forgot password error:', err);
+        msgEl.textContent = 'Network error';
+        msgEl.classList.add('text-red-500');
+      }
+    });
+  </script>
+</body>
+</html>
+
+

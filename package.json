@@ -1,0 +1,21 @@
+{
+  "name": "miniprojectnode",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "ejs": "^3.1.10",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.16.3",
+    "sequelize": "^6.37.7",
+    "socket.io": "^4.8.3"
+  }
+}

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= filename %></title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-zinc-900 text-white p-10">
+  <div class="max-w-2xl mx-auto">
+    <a href="/home" class="mb-6 inline-block px-4 py-2 bg-emerald-600 rounded-md hover:bg-emerald-700">
+      ← Back to Tasks
+    </a>
+    <h1 class="text-3xl font-bold mb-6"><%= filename %></h1>
+    <div class="bg-zinc-800 p-8 rounded-lg">
+      <pre class="whitespace-pre-wrap"><%= filedata %></pre>
+    </div>
+  </div>
+</body>
+</html>
