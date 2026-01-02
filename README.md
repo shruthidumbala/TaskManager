@@ -1,6 +1,6 @@
 # Task Manager
 
-A Node.js + Express + MongoDB task manager project.
+A Node.js + Express + PostgreSQL task manager project.
 
 ## Features
 - User authentication
